@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AnythingToOS - Convert ZIP to ISO (Hex Edit)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; background: #181c20; color: #f8f8f2; margin: 0; padding: 0;}
+    header { background: #222831; padding: 2rem 1rem 1rem 1rem; text-align: center;}
+    h1 { margin: 0 0 0.4em 0; color: #00e6ac;}
+    .container { max-width:600px; background:#23272e; margin:2rem auto 0 auto; padding:2rem; border-radius:10px; box-shadow:0 0 24px #1118;}
+    label { display:block; margin-top:1em; margin-bottom:0.2em;}
+    input[type="file"], input[type="text"] { width:100%; padding:0.5em; border:none; border-radius:4px; margin-bottom:1em; background:#252a34; color:#fff; font-size:1em;}
+    button { background:#00e6ac; color:#222831; border:none; border-radius:4px; padding:1em 2em; font-size:1.1em; cursor:pointer; margin-top:1em;}
+    button:disabled { background:#888; cursor:not-allowed;}
+    .step { margin-bottom:2em;}
+    .result { margin-top:2em; padding:1em; background:#353941; border-radius:6px; font-size:1.1em;}
+    .footer { color:#888; text-align:center; margin:3em 0 1em 0; font-size:0.95em;}
+    a { color:#00e6ac;}
+    #editZipDiv { background: #292f36; border-radius: 8px; padding: 1em; margin: 2em 0;}
+    #hint { margin-top: 2em; background: #252a34; color: #ffd966; border-radius: 7px; padding: 1em; font-size: 1.1em;}
+  </style>
+  <!-- JSZip for creating ZIP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>AnythingToOS</h1>
+    <p>1. Convert your software to a ZIP file.<br>2. Edit the ZIP file to become a bootable ISO!</p>
+  </header>
+  <div class="container">
+    <form id="makeZipForm" autocomplete="off">
+      <div class="step">
+        <label for="inputFile">Step 1: Select your software file or folder</label>
+        <input type="file" id="inputFile" webkitdirectory directory multiple>
+      </div>
+      <div class="step">
+        <label for="osName">Step 2: Name your OS (optional)</label>
+        <input type="text" id="osName" placeholder="MyOS">
+      </div>
+      <div class="step">
+        <button type="submit" id="generateZipBtn" disabled>Translate to ZIP</button>
+      </div>
+    </form>
+    <div class="result" id="makeZipMsg" style="display:none;"></div>
+    <div id="editZipDiv" style="display:none;">
+      <h3>Edit your ZIP to ISO</h3>
+      <p>
+        Now, upload your <b>ZIP file</b> below to edit it into a bootable ISO (by hex-edit).<br>
+        <input type="file" id="importZipFile" accept=".zip">
+      </p>
+      <div id="isoDownloadMsg"></div>
+    </div>
+    <div id="hint" style="display:none;">
+      <b>To create a bootable ISO, use <a href="https://wiki.gnome.org/Apps/Brasero" target="_blank">Brasero</a> on Linux:</b>
+      <ol>
+        <li>Extract your ZIP file to a folder.</li>
+        <li>Open <b>Brasero</b> (install it if needed: <code>sudo apt install brasero</code>).</li>
+        <li>Choose <b>Data Project</b> and add your ISO.</li>
+        <li>Click the <b>Burn</b> icon and select "Image File" to export as an bootable ISO.</li>
+      </ol>
+      <div style="margin-top:0.5em;">
+        <i>This HTML app's ISO is not guaranteed to be bootable. Use Brasero or a tool like <code>mkisofs</code> for a bootable ISO!</i>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    &copy; 2025 AnythingToOS. | <a href="#">GitHub</a>
+  </div>
+  <script>
+    const inputFile = document.getElementById('inputFile');
+    const generateZipBtn = document.getElementById('generateZipBtn');
+    const makeZipForm = document.getElementById('makeZipForm');
+    const makeZipMsg = document.getElementById('makeZipMsg');
+    const osNameInput = document.getElementById('osName');
+    const editZipDiv = document.getElementById('editZipDiv');
+    const importZipFile = document.getElementById('importZipFile');
+    const isoDownloadMsg = document.getElementById('isoDownloadMsg');
+    const hint = document.getElementById('hint');
+    let lastZipBlobUrl = null;
+
+    // Enable ZIP translation if file(s) selected
+    inputFile.addEventListener('change', function() {
+      generateZipBtn.disabled = !inputFile.files.length;
+    });
+
+    // Translate software to ZIP and offer download
+    makeZipForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      let fileList = inputFile.files;
+      if (!fileList.length) {
+        makeZipMsg.style.display = 'block';
+        makeZipMsg.innerHTML = '<span style="color:#ff5555;">Please select a valid file or folder.</span>';
+        return;
+      }
+      makeZipMsg.style.display = 'block';
+      makeZipMsg.innerHTML = `<b>Translating your software to ZIP...</b>`;
+
+      // Assemble ZIP
+      const zip = new JSZip();
+      for (const file of fileList) {
+        let relPath = file.webkitRelativePath || file.name;
+        zip.file(relPath, file);
+      }
+      zip.file("OS_NAME.txt", osNameInput.value.trim() || "AnythingToOS");
+
+      const zipBlob = await zip.generateAsync({type:"blob"});
+      if (lastZipBlobUrl) URL.revokeObjectURL(lastZipBlobUrl);
+      lastZipBlobUrl = URL.createObjectURL(zipBlob);
+
+      makeZipMsg.innerHTML = `<b>Done!</b> <br>Your software has been translated to a ZIP file.<br>
+        <a href="${lastZipBlobUrl}" download="AnythingToOS-output.zip">Download ZIP file</a><br>
+        <br>Next: Edit your ZIP to ISO below.`;
+      editZipDiv.style.display = "block";
+      isoDownloadMsg.innerHTML = '';
+      hint.style.display = "none";
+    });
+
+    // Edit ZIP to ISO (simulate by changing extension and hex-editing first bytes)
+    importZipFile.addEventListener('change', async function() {
+      const files = importZipFile.files;
+      if (!files.length) {
+        isoDownloadMsg.innerHTML = '';
+        return;
+      }
+      isoDownloadMsg.innerHTML = "<b>Editing your ZIP file to ISO (by hex-edit)...</b>";
+      const zip = files[0];
+      const arrayBuffer = await zip.arrayBuffer();
+      // Simulate hex-edit: overwrite first bytes with ISO9660 header (CD001 at 0x8001)
+      const buf = new Uint8Array(arrayBuffer);
+      // ISO9660: "CD001" at offset 0x8001 (sector 16, offset 1)
+      // We'll write it at 0x8001 if the file is big enough, else at start for demo
+      const cd001 = [0x43, 0x44, 0x30, 0x30, 0x31]; // "CD001"
+      let pos = (buf.length > 0x8005) ? 0x8001 : 0;
+      for (let i = 0; i < cd001.length; ++i) buf[pos+i] = cd001[i];
+      // For demo, also change extension and offer for download
+      const isoBlob = new Blob([buf], {type: "application/octet-stream"});
+      const isoUrl = URL.createObjectURL(isoBlob);
+      isoDownloadMsg.innerHTML = `<b>Your OS ISO is ready!</b><br>
+        <a href="${isoUrl}" download="AnythingToOS-output.iso" style="font-size:1.2em;">Download ISO</a>
+        <br><em>This is a non-bootable ISO file. For a bootable ISO, see the instructions below.</em>`;
+      hint.style.display = "block";
+    });
+  </script>
+</body>
+</html>
